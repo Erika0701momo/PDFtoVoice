@@ -1,25 +1,22 @@
 import tempfile
-import pymupdf
 import fitz
 import cryptography
 import os
-import simpleaudio
 from google.cloud import texttospeech
+import faulthandler
+import pygame
 
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="C:/Users/user/serviceAccountKey/pdftoaudiobook-429604-87f458fbff39.json"
+if __name__ == "__main__":
+    faulthandler.enable()
 
-# PDFからテキスト抽出
-doc = fitz.open("./マインドフルネス・セルフコンパッション.pdf")
-# text_to_read = doc[0].get_text()
-text_to_read = ""
-for page in doc:
-    text_to_read = text_to_read + page.get_text()
+# googleサービスアカウントの鍵を設定
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="○○"
+
+# PDFファイルを読み込む
+doc = fitz.open("./マインドフルネス呼吸.pdf")
 
 # clientをインスタンス化
 client = texttospeech.TextToSpeechClient()
-
-# 読み上げられるテキストをセット
-synthesis_input = texttospeech.SynthesisInput(text=text_to_read)
 
 # 声の設定
 voice = texttospeech.VoiceSelectionParams(
@@ -34,15 +31,28 @@ audio_config = texttospeech.AudioConfig(
     speaking_rate=1.3
 )
 
-# テキスト入力に対して、選択した音声パラメータと音声ファイルタイプで音声合成リクエストを実行する
-response = client.synthesize_speech(
-    input=synthesis_input, voice=voice, audio_config=audio_config
-)
 
-# 音声ファイルを再生
-with tempfile.TemporaryDirectory() as tmp:
-    with open(f"{tmp}/output.wav", "wb") as f:
-        f.write(response.audio_content)
-        wav_obj = simpleaudio.WaveObject.from_wave_file(f"{tmp}/output.wav")
-        play_obj = wav_obj.play()
-        play_obj.wait_done()
+for page in doc:
+    text_to_read = page.get_text()
+
+    # 読み上げられるテキストをセット
+    synthesis_input = texttospeech.SynthesisInput(text=text_to_read)
+
+    # テキスト入力に対して、選択した音声パラメータと音声ファイルタイプで音声合成リクエストを実行する
+    response = client.synthesize_speech(
+        input=synthesis_input, voice=voice, audio_config=audio_config
+    )
+
+    # 音声ファイルを再生
+    with tempfile.TemporaryDirectory() as tmp:
+        output_file = f"{tmp}/output.wav"
+        with open(output_file, "wb") as f:
+            f.write(response.audio_content)
+        pygame.mixer.init()
+        pygame.mixer.music.load(output_file)
+        pygame.mixer.music.play()
+        while pygame.mixer.music.get_busy():
+            pygame.time.Clock().tick(10)
+        print("1ページ読み上げ終了")
+
+        pygame.mixer.music.unload()  # ファイルの使用を解除する
